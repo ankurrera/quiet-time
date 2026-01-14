@@ -52,6 +52,8 @@ export function validatePassword(password: string): { isValid: boolean; error?: 
 }
 
 export function validateEmail(email: string): { isValid: boolean; error?: string } {
+  // Basic client-side validation. Supabase performs authoritative server-side validation.
+  // This regex supports plus addressing (user+tag@example.com) and international domains.
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!email || !emailRegex.test(email)) {
     return {

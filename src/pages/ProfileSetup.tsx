@@ -30,8 +30,7 @@ export default function ProfileSetup() {
     }
   }, [isInitialized, isLoading, user, profile, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitProfile = async () => {
     setError(null);
 
     if (!preferredName.trim()) {
@@ -55,6 +54,11 @@ export default function ProfileSetup() {
     } else if (result.error) {
       setError(result.error);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitProfile();
   };
 
   // Show loading while checking auth state
@@ -199,13 +203,7 @@ export default function ProfileSetup() {
         <div className="text-center">
           <button
             type="button"
-            onClick={() => {
-              if (preferredName.trim()) {
-                handleSubmit({ preventDefault: () => {} } as React.FormEvent);
-              } else {
-                setError("Please enter what you'd like to be called.");
-              }
-            }}
+            onClick={submitProfile}
             disabled={isSubmitting}
             className="text-sm text-muted-foreground/70 underline-offset-4 hover:underline transition-calm disabled:opacity-50"
           >
