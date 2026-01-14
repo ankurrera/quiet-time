@@ -4,6 +4,16 @@ import { useGymSession } from "@/hooks/useGymSession";
 import { formatDuration, formatExerciseDetails } from "@/lib/gymSessionTypes";
 
 /**
+ * Color system from design spec (strict)
+ */
+const colors = {
+  secondary: "#6F6F6F",      // Secondary text
+  inactive: "#DADADA",       // Inactive dots
+  container: "#EAEAEA",      // Background containers
+  todayIndicator: "#C0392B", // Today indicator (only red allowed)
+} as const;
+
+/**
  * Gym Session Detail Page
  * 
  * Design Philosophy:
@@ -28,7 +38,7 @@ export function GymSessionDetail() {
       return (
         <span 
           className="inline-block w-2 h-2 rounded-full border-2 mr-2"
-          style={{ borderColor: "#C0392B" }}
+          style={{ borderColor: colors.todayIndicator }}
         />
       );
     }
@@ -40,7 +50,7 @@ export function GymSessionDetail() {
     return (
       <span 
         className="inline-block w-2 h-2 rounded-full mr-2"
-        style={{ backgroundColor: "#DADADA" }}
+        style={{ backgroundColor: colors.inactive }}
       />
     );
   };
@@ -66,7 +76,7 @@ export function GymSessionDetail() {
           {/* Small label - light, uppercase */}
           <p 
             className="text-xs font-light uppercase tracking-widest mb-2"
-            style={{ color: "#6F6F6F" }}
+            style={{ color: colors.secondary }}
           >
             Session
           </p>
@@ -79,7 +89,7 @@ export function GymSessionDetail() {
           {/* Subtext - light gray */}
           <p 
             className="text-sm font-light"
-            style={{ color: "#6F6F6F" }}
+            style={{ color: colors.secondary }}
           >
             Day {session.dayOfYear} of {totalDays}
           </p>
@@ -96,13 +106,13 @@ export function GymSessionDetail() {
         {/* MAIN CONTENT CARD - Soft container */}
         <div 
           className="rounded-3xl p-8 mb-8"
-          style={{ backgroundColor: "#EAEAEA" }}
+          style={{ backgroundColor: colors.container }}
         >
           {/* SECTION 1 — TIME SPENT */}
           <section className="mb-8">
             <p 
               className="text-xs font-light uppercase tracking-widest mb-2"
-              style={{ color: "#6F6F6F" }}
+              style={{ color: colors.secondary }}
             >
               Time
             </p>
@@ -112,7 +122,7 @@ export function GymSessionDetail() {
             {session.status === "completed" && (session.includesWarmup || session.includesCooldown) && (
               <p 
                 className="text-xs font-light mt-1"
-                style={{ color: "#6F6F6F" }}
+                style={{ color: colors.secondary }}
               >
                 Including warm-up and cooldown
               </p>
@@ -147,7 +157,7 @@ export function GymSessionDetail() {
                     {exercise.note && (
                       <p 
                         className="text-sm italic mt-1"
-                        style={{ color: "#6F6F6F" }}
+                        style={{ color: colors.secondary }}
                       >
                         {exercise.note}
                       </p>
@@ -163,7 +173,7 @@ export function GymSessionDetail() {
             <section>
               <p 
                 className="text-xs font-light uppercase tracking-widest mb-2"
-                style={{ color: "#6F6F6F" }}
+                style={{ color: colors.secondary }}
               >
                 Notes
               </p>
@@ -178,7 +188,7 @@ export function GymSessionDetail() {
         <footer className="text-center mt-auto">
           <p 
             className="text-sm font-light"
-            style={{ color: "#6F6F6F" }}
+            style={{ color: colors.secondary }}
           >
             {getFooterMessage()}
           </p>
