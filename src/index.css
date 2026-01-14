@@ -27,12 +27,18 @@
     --muted-foreground: 0 0% 40%;
 
     /* Soft gray for inactive elements */
-    --soft-gray: 0 0% 80%;
-    --lighter-gray: 0 0% 88%;
+    --soft-gray: 0 0% 85%;
+    --lighter-gray: 0 0% 92%;
+    
+    /* Container background */
+    --container: 0 0% 92%;
+    
+    /* Secondary text color (#6F6F6F) */
+    --text-secondary: 0 0% 44%;
 
     /* Accent - subtle green for "today" indicator */
     --accent-green: 142 40% 45%;
-    --accent-red: 0 70% 55%;
+    --accent-red: 4 60% 48%;
 
     /* Primary button - black */
     --primary: 0 0% 0%;
@@ -85,6 +91,8 @@
     --muted-foreground: 0 0% 60%;
     --soft-gray: 0 0% 30%;
     --lighter-gray: 0 0% 20%;
+    --container: 0 0% 15%;
+    --text-secondary: 0 0% 55%;
     --primary: 0 0% 100%;
     --primary-foreground: 0 0% 0%;
     --secondary: 0 0% 15%;
