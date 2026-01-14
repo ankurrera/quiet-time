@@ -1,13 +1,43 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { AppShell } from "@/components/layout/AppShell";
+import { Header } from "@/components/layout/Header";
+import { ViewToggle } from "@/components/layout/ViewToggle";
+import { YearProgressBar } from "@/components/views/YearProgressBar";
+import { YearDotGrid } from "@/components/views/YearDotGrid";
+import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+
+type View = "bar" | "grid";
 
 const Index = () => {
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    // Check if user has seen onboarding
+    return !localStorage.getItem("tempo-onboarding-complete");
+  });
+  
+  const [currentView, setCurrentView] = useState<View>("bar");
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem("tempo-onboarding-complete", "true");
+    setShowOnboarding(false);
+  };
+
+  // Show onboarding if not complete
+  if (showOnboarding) {
+    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <AppShell>
+      <Header />
+      
+      {currentView === "bar" ? (
+        <YearProgressBar onViewChange={() => setCurrentView("grid")} />
+      ) : (
+        <YearDotGrid onViewChange={() => setCurrentView("bar")} />
+      )}
+      
+      <ViewToggle currentView={currentView} onViewChange={setCurrentView} />
+    </AppShell>
   );
 };
 
