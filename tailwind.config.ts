@@ -57,6 +57,8 @@ export default {
           gray: "hsl(var(--soft-gray))",
           light: "hsl(var(--lighter-gray))",
         },
+        container: "hsl(var(--container))",
+        "text-secondary": "hsl(var(--text-secondary))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

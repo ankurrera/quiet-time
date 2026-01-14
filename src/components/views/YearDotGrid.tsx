@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useGymData } from "@/hooks/useGymData";
 import { getDateFromDayOfYear, formatDateShort } from "@/lib/dateUtils";
@@ -8,6 +9,7 @@ interface YearDotGridProps {
 }
 
 export function YearDotGrid({ onViewChange }: YearDotGridProps) {
+  const navigate = useNavigate();
   const { stats, isAttended, isToday, isPast, year } = useGymData();
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   
@@ -16,6 +18,11 @@ export function YearDotGrid({ onViewChange }: YearDotGridProps) {
   
   // Calculate grid dimensions (roughly 20 columns)
   const columns = 20;
+
+  // Navigate to session detail page
+  const handleDayClick = (day: number) => {
+    navigate(`/session/${day}`);
+  };
   
   return (
     <div className="flex-1 flex items-center justify-center px-6 animate-fade-in">
@@ -50,6 +57,7 @@ export function YearDotGrid({ onViewChange }: YearDotGridProps) {
                 return (
                   <button
                     key={day}
+                    onClick={() => handleDayClick(day)}
                     className={`
                       w-2 h-2 rounded-full transition-calm cursor-pointer
                       ${today 

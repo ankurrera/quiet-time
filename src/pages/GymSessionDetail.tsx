@@ -4,16 +4,6 @@ import { useGymSession } from "@/hooks/useGymSession";
 import { formatDuration, formatExerciseDetails } from "@/lib/gymSessionTypes";
 
 /**
- * Color system from design spec (strict)
- */
-const colors = {
-  secondary: "#6F6F6F",      // Secondary text
-  inactive: "#DADADA",       // Inactive dots
-  container: "#EAEAEA",      // Background containers
-  todayIndicator: "#C0392B", // Today indicator (only red allowed)
-} as const;
-
-/**
  * Gym Session Detail Page
  * 
  * Design Philosophy:
@@ -34,24 +24,18 @@ export function GymSessionDetail() {
   // Determine dot indicator style based on status
   const getDotIndicator = () => {
     if (session.isToday) {
-      // Red outline for today
+      // Red outline for today (◉)
       return (
-        <span 
-          className="inline-block w-2 h-2 rounded-full border-2 mr-2"
-          style={{ borderColor: colors.todayIndicator }}
-        />
+        <span className="inline-block w-2 h-2 rounded-full border-2 border-accent-red mr-2" />
       );
     }
     if (session.status === "completed") {
-      // Dark filled dot for completed
-      return <span className="inline-block w-2 h-2 rounded-full bg-black mr-2" />;
+      // Dark filled dot for completed (●)
+      return <span className="inline-block w-2 h-2 rounded-full bg-foreground mr-2" />;
     }
-    // Light dot for skipped/rest
+    // Light dot for skipped/rest (○)
     return (
-      <span 
-        className="inline-block w-2 h-2 rounded-full mr-2"
-        style={{ backgroundColor: colors.inactive }}
-      />
+      <span className="inline-block w-2 h-2 rounded-full bg-soft-gray mr-2" />
     );
   };
   
@@ -70,33 +54,27 @@ export function GymSessionDetail() {
 
   return (
     <AppShell>
-      <div className="flex-1 flex flex-col px-6 py-8 animate-fade-in">
+      <div className="flex-1 flex flex-col px-6 py-12 animate-fade-in max-w-md mx-auto w-full">
         {/* HEADER - Very Subtle, Centered */}
-        <header className="text-center mb-8">
+        <header className="text-center mb-10">
           {/* Small label - light, uppercase */}
-          <p 
-            className="text-xs font-light uppercase tracking-widest mb-2"
-            style={{ color: colors.secondary }}
-          >
+          <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-3">
             Session
           </p>
           
           {/* Primary heading - serif */}
-          <h1 className="font-serif text-2xl tracking-tight mb-1">
+          <h1 className="font-serif text-2xl tracking-tight mb-2">
             {dayName}, {monthDay}
           </h1>
           
           {/* Subtext - light gray */}
-          <p 
-            className="text-sm font-light"
-            style={{ color: colors.secondary }}
-          >
+          <p className="text-sm font-light text-text-secondary">
             Day {session.dayOfYear} of {totalDays}
           </p>
         </header>
         
         {/* SESSION STATUS - Single line, centered */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10">
           <p className="text-sm font-light flex items-center justify-center">
             {getDotIndicator()}
             {getStatusText()}
@@ -104,33 +82,24 @@ export function GymSessionDetail() {
         </div>
         
         {/* MAIN CONTENT CARD - Soft container */}
-        <div 
-          className="rounded-3xl p-8 mb-8"
-          style={{ backgroundColor: colors.container }}
-        >
+        <div className="bg-container rounded-3xl p-8 mb-10">
           {/* SECTION 1 — TIME SPENT */}
-          <section className="mb-8">
-            <p 
-              className="text-xs font-light uppercase tracking-widest mb-2"
-              style={{ color: colors.secondary }}
-            >
+          <section className="mb-10">
+            <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2">
               Time
             </p>
             <p className="font-serif text-3xl tracking-tight">
               {formatDuration(session.duration || 0)}
             </p>
             {session.status === "completed" && (session.includesWarmup || session.includesCooldown) && (
-              <p 
-                className="text-xs font-light mt-1"
-                style={{ color: colors.secondary }}
-              >
+              <p className="text-xs font-light text-text-secondary mt-2">
                 Including warm-up and cooldown
               </p>
             )}
           </section>
           
           {/* SECTION 2 — WORKOUT TYPE */}
-          <section className="mb-8">
+          <section className="mb-10">
             <p className="text-base font-light">
               {session.workoutTypes.join(" • ")}
             </p>
@@ -138,8 +107,8 @@ export function GymSessionDetail() {
           
           {/* SECTION 3 — EXERCISE LOG */}
           {session.exercises.length > 0 && (
-            <section className="mb-8">
-              <div className="space-y-6">
+            <section className="mb-10">
+              <div className="space-y-8">
                 {session.exercises.map((exercise, index) => (
                   <div key={index}>
                     {/* Exercise name - serif */}
@@ -147,18 +116,12 @@ export function GymSessionDetail() {
                       {exercise.name}
                     </p>
                     {/* Details - monospaced/tight */}
-                    <p 
-                      className="text-sm font-light tracking-tight"
-                      style={{ fontFamily: "ui-monospace, monospace" }}
-                    >
+                    <p className="text-sm font-light tracking-tight font-mono text-foreground/80">
                       {formatExerciseDetails(exercise)}
                     </p>
                     {/* Optional note - italic, gray */}
                     {exercise.note && (
-                      <p 
-                        className="text-sm italic mt-1"
-                        style={{ color: colors.secondary }}
-                      >
+                      <p className="text-sm italic text-text-secondary mt-1.5">
                         {exercise.note}
                       </p>
                     )}
@@ -171,10 +134,7 @@ export function GymSessionDetail() {
           {/* SECTION 4 — SESSION NOTES (only if present) */}
           {session.notes && (
             <section>
-              <p 
-                className="text-xs font-light uppercase tracking-widest mb-2"
-                style={{ color: colors.secondary }}
-              >
+              <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2">
                 Notes
               </p>
               <p className="text-sm font-light leading-relaxed">
@@ -185,11 +145,8 @@ export function GymSessionDetail() {
         </div>
         
         {/* FOOTER — Time Context, Very Quiet */}
-        <footer className="text-center mt-auto">
-          <p 
-            className="text-sm font-light"
-            style={{ color: colors.secondary }}
-          >
+        <footer className="text-center mt-auto pt-8">
+          <p className="text-sm font-light text-text-secondary">
             {getFooterMessage()}
           </p>
         </footer>
