@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
-import { parse, format, isToday as isTodayFn } from "date-fns";
-import type { Database } from "@/lib/database.types";
+import { parse, isToday as isTodayFn } from "date-fns";
+import type { Database, Json } from "@/lib/database.types";
 
 type GymSessionRow = Database["public"]["Tables"]["gym_sessions"]["Row"];
 type GymSessionInsert = Database["public"]["Tables"]["gym_sessions"]["Insert"];
@@ -118,10 +118,11 @@ export function useGymSession(dateString: string) {
       try {
         if (session.exists && session.id) {
           // Update existing session
+          const exercisesToSave = updates.exercises !== undefined ? updates.exercises : session.exercises;
           const updateData: GymSessionUpdate = {
             duration_minutes: updates.duration_minutes !== undefined ? updates.duration_minutes : session.duration_minutes,
             workout_type: updates.workout_type !== undefined ? updates.workout_type : session.workout_type,
-            exercises: updates.exercises !== undefined ? updates.exercises : session.exercises,
+            exercises: exercisesToSave as unknown as Json,
             notes: updates.notes !== undefined ? updates.notes : session.notes,
           };
 
@@ -152,12 +153,13 @@ export function useGymSession(dateString: string) {
           return { success: true };
         } else {
           // Create new session
+          const exercisesToInsert = updates.exercises || [];
           const insertData: GymSessionInsert = {
             user_id: user.id,
             session_date: dateString,
             duration_minutes: updates.duration_minutes || null,
             workout_type: updates.workout_type || null,
-            exercises: updates.exercises || [],
+            exercises: exercisesToInsert as unknown as Json,
             notes: updates.notes || null,
           };
 
