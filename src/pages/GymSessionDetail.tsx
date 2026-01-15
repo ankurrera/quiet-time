@@ -54,12 +54,13 @@ export function GymSessionDetail() {
   const debouncedNotes = useDebounce(editNotes, AUTOSAVE_DELAY_MS);
 
   // Initialize edit state when session loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (session) {
       setEditDuration(session.duration_minutes?.toString() || "");
       setEditNotes(session.notes || "");
     }
-  }, [session?.id]);
+  }, [session?.id, session?.duration_minutes, session?.notes]);
 
   // Autosave when debounced values change
   useEffect(() => {
@@ -360,7 +361,7 @@ function SetRow({ set, onUpdate }: SetRowProps) {
         weight: debouncedWeight ? parseFloat(debouncedWeight) : null,
       });
     }
-  }, [debouncedReps, debouncedWeight]);
+  }, [debouncedReps, debouncedWeight, set.reps, set.weight, onUpdate]);
 
   return (
     <div className="flex items-center gap-3 text-sm">

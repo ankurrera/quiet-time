@@ -37,6 +37,7 @@ export function RoutineDetail() {
   const debouncedFocus = useDebounce(editFocus, AUTOSAVE_DELAY_MS);
 
   // Initialize edit state when routine loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (routine) {
       setEditName(routine.name);
@@ -308,7 +309,7 @@ function ExerciseItem({ exercise, onUpdate, onDelete }: ExerciseItemProps) {
         rest_seconds: debouncedRest ? parseInt(debouncedRest, 10) : null,
       });
     }
-  }, [debouncedName, debouncedSets, debouncedReps, debouncedRest]);
+  }, [debouncedName, debouncedSets, debouncedReps, debouncedRest, exercise.name, exercise.sets, exercise.reps, exercise.rest_seconds, onUpdate]);
 
   return (
     <div className="bg-container rounded-3xl p-6">
