@@ -3,25 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { YearViewPanel } from "@/components/YearViewPanel";
 import { useGymSession } from "@/hooks/useGymSession";
+import { useDebounce } from "@/hooks/useDebounce";
+import { getDayOfYear } from "@/lib/dateUtils";
 import { format, parse, addDays, subDays } from "date-fns";
 import { Calendar } from "lucide-react";
 
-// Debounce utility
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
+// Constants
+const AUTOSAVE_DELAY_MS = 1000;
+const MIN_SWIPE_DISTANCE_PX = 50;
 
 /**
  * Gym Session Detail Page
@@ -46,9 +35,7 @@ export function GymSessionDetail() {
   const date = parse(dateString, "yyyy-MM-dd", new Date());
   const dayName = format(date, "EEEE");
   const monthDay = format(date, "MMM d");
-  const dayOfYear = Math.floor(
-    (date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const dayOfYear = getDayOfYear(date);
   const totalDays = date.getFullYear() % 4 === 0 ? 366 : 365;
 
   // Local state for editing
@@ -57,9 +44,9 @@ export function GymSessionDetail() {
   const [editNotes, setEditNotes] = useState<string>("");
 
   // Debounced values for autosave
-  const debouncedDuration = useDebounce(editDuration, 1000);
-  const debouncedWorkoutType = useDebounce(editWorkoutType, 1000);
-  const debouncedNotes = useDebounce(editNotes, 1000);
+  const debouncedDuration = useDebounce(editDuration, AUTOSAVE_DELAY_MS);
+  const debouncedWorkoutType = useDebounce(editWorkoutType, AUTOSAVE_DELAY_MS);
+  const debouncedNotes = useDebounce(editNotes, AUTOSAVE_DELAY_MS);
 
   // When entering edit mode, populate local state
   const handleStartEdit = () => {
@@ -114,9 +101,6 @@ export function GymSessionDetail() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  // Minimum swipe distance (in px)
-  const minSwipeDistance = 50;
-
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -130,8 +114,8 @@ export function GymSessionDetail() {
     if (!touchStart || !touchEnd) return;
 
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    const isLeftSwipe = distance > MIN_SWIPE_DISTANCE_PX;
+    const isRightSwipe = distance < -MIN_SWIPE_DISTANCE_PX;
 
     if (isLeftSwipe) {
       // Swipe left → next day

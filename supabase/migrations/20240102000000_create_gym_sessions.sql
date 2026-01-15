@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_gym_sessions_user_date ON public.gym_sessions(use
 CREATE OR REPLACE FUNCTION update_gym_sessions_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
+  NEW.updated_at = CLOCK_TIMESTAMP();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

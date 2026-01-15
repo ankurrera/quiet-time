@@ -27,6 +27,13 @@ export interface GymSessionData {
   isToday: boolean;
 }
 
+export interface UpdateSessionData {
+  duration_minutes?: number | null;
+  workout_type?: string | null;
+  exercises?: Exercise[];
+  notes?: string | null;
+}
+
 /**
  * Hook to manage gym session data for a specific date
  * Automatically fetches, creates, and updates sessions
@@ -105,7 +112,7 @@ export function useGymSession(dateString: string) {
 
   // Create or update session
   const saveSession = useCallback(
-    async (updates: Partial<Omit<GymSessionData, "id" | "date" | "exists" | "isToday">>) => {
+    async (updates: UpdateSessionData) => {
       if (!user || !session) return { success: false, error: "No user or session" };
 
       try {
