@@ -26,6 +26,8 @@ export function GymSessionDetail() {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [showYearView, setShowYearView] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
   
   // Validate and use date parameter, default to today
   const dateString = dateParam || format(new Date(), "yyyy-MM-dd");
@@ -83,47 +85,70 @@ export function GymSessionDetail() {
     setIsEditing(false);
   };
 
-  // Navigate to previous day
-  const goToPreviousDay = () => {
+  // Navigate to previous day with animation
+  const goToPreviousDay = useCallback(() => {
+    setSwipeDirection("right");
     const prevDate = subDays(date, 1);
     const prevDateString = format(prevDate, "yyyy-MM-dd");
-    navigate(`/session/${prevDateString}`);
-  };
+    setTimeout(() => navigate(`/session/${prevDateString}`), 50);
+  }, [date, navigate]);
 
-  // Navigate to next day
-  const goToNextDay = () => {
+  // Navigate to next day with animation
+  const goToNextDay = useCallback(() => {
+    setSwipeDirection("left");
     const nextDate = addDays(date, 1);
     const nextDateString = format(nextDate, "yyyy-MM-dd");
-    navigate(`/session/${nextDateString}`);
-  };
+    setTimeout(() => navigate(`/session/${nextDateString}`), 50);
+  }, [date, navigate]);
+
+  // Reset swipe state when date changes
+  useEffect(() => {
+    setSwipeDirection(null);
+    setSwipeOffset(0);
+  }, [dateString]);
 
   // Touch/swipe handling for mobile
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const onTouchStart = (e: React.TouchEvent) => {
+    if (isEditing) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (isEditing || !touchStart) return;
+    const currentX = e.targetTouches[0].clientX;
+    setTouchEnd(currentX);
+    
+    // Calculate offset for visual feedback (clamped)
+    const diff = currentX - touchStart;
+    const clampedOffset = Math.max(-60, Math.min(60, diff * 0.4));
+    setSwipeOffset(clampedOffset);
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (!touchStart || !touchEnd) {
+      setSwipeOffset(0);
+      return;
+    }
 
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > MIN_SWIPE_DISTANCE_PX;
     const isRightSwipe = distance < -MIN_SWIPE_DISTANCE_PX;
 
     if (isLeftSwipe) {
-      // Swipe left → next day
       goToNextDay();
     } else if (isRightSwipe) {
-      // Swipe right → previous day
       goToPreviousDay();
+    } else {
+      // Reset offset if no navigation
+      setSwipeOffset(0);
     }
+    
+    setTouchStart(null);
+    setTouchEnd(null);
   };
 
   if (isLoading || !session) {
@@ -145,7 +170,12 @@ export function GymSessionDetail() {
       <YearViewPanel isOpen={showYearView} onClose={() => setShowYearView(false)} />
       
       <div 
-        className="flex-1 flex flex-col px-6 py-12 animate-fade-in max-w-md mx-auto w-full"
+        className={`flex-1 flex flex-col px-6 py-12 max-w-md mx-auto w-full transition-transform duration-150 ease-out ${
+          swipeDirection === "left" ? "animate-slide-in-from-right" : 
+          swipeDirection === "right" ? "animate-slide-in-from-left" : 
+          "animate-fade-in"
+        }`}
+        style={{ transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
