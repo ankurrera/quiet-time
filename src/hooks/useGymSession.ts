@@ -1,155 +1,197 @@
-import { useMemo } from "react";
-import { getDayOfYear, getDateFromDayOfYear, getDaysInYear } from "@/lib/dateUtils";
-import type { GymSession, Exercise, SessionStatus } from "@/lib/gymSessionTypes";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "./useAuth";
+import { parse, format, isToday as isTodayFn } from "date-fns";
+import type { Database } from "@/lib/database.types";
+
+type GymSessionRow = Database["public"]["Tables"]["gym_sessions"]["Row"];
+type GymSessionInsert = Database["public"]["Tables"]["gym_sessions"]["Insert"];
+type GymSessionUpdate = Database["public"]["Tables"]["gym_sessions"]["Update"];
+
+export interface Exercise {
+  name: string;
+  sets?: number;
+  reps?: number;
+  weight?: number;
+  note?: string;
+}
+
+export interface GymSessionData {
+  id?: string;
+  date: string; // YYYY-MM-DD format
+  duration_minutes?: number | null;
+  workout_type?: string | null;
+  exercises: Exercise[];
+  notes?: string | null;
+  exists: boolean;
+  isToday: boolean;
+}
 
 /**
- * Generate mock session data for a specific day
+ * Hook to manage gym session data for a specific date
+ * Automatically fetches, creates, and updates sessions
  */
-function generateMockSession(dayOfYear: number, year: number): GymSession {
-  const date = getDateFromDayOfYear(dayOfYear, year);
-  const today = getDayOfYear(new Date());
-  const isToday = dayOfYear === today;
-  const dayOfWeek = date.getDay();
-  
-  // Determine status based on day patterns
-  // Rest days on Sunday (0) or if randomly selected
-  const isRestDay = dayOfWeek === 0 || (dayOfWeek === 6 && Math.random() < 0.3);
-  
-  // For future days or randomly skipped
-  const isFuture = dayOfYear > today;
-  const isSkipped = !isFuture && !isRestDay && Math.random() < 0.1;
-  
-  let status: SessionStatus;
-  if (isRestDay) {
-    status = "rest";
-  } else if (isSkipped || isFuture) {
-    status = "skipped";
-  } else {
-    status = "completed";
-  }
-  
-  // Generate workout data for completed sessions
-  const workoutTypes = generateWorkoutTypes(dayOfWeek);
-  const exercises = status === "completed" ? generateExercises(workoutTypes) : [];
-  const duration = status === "completed" ? 60 + Math.floor(Math.random() * 30) : 0;
-  
-  return {
-    date,
-    dayOfYear,
-    status,
-    isToday,
-    duration,
-    includesWarmup: status === "completed",
-    includesCooldown: status === "completed",
-    workoutTypes: status === "rest" ? ["Recovery", "Mobility"] : workoutTypes,
-    exercises,
-    notes: generateNotes(status),
-  };
-}
+export function useGymSession(dateString: string) {
+  const { user } = useAuth();
+  const [session, setSession] = useState<GymSessionData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-function generateWorkoutTypes(dayOfWeek: number): string[] {
-  const workoutSchedule: Record<number, string[]> = {
-    1: ["Push", "Chest", "Triceps"], // Monday
-    2: ["Pull", "Back", "Biceps"],   // Tuesday
-    3: ["Legs", "Glutes"],           // Wednesday
-    4: ["Push", "Shoulders"],        // Thursday
-    5: ["Pull", "Back", "Biceps"],   // Friday
-    6: ["Legs", "Core"],             // Saturday
-    0: ["Recovery", "Mobility"],     // Sunday
-  };
-  return workoutSchedule[dayOfWeek] || ["Full Body"];
-}
+  // Parse date and check if it's today
+  const date = parse(dateString, "yyyy-MM-dd", new Date());
+  const isToday = isTodayFn(date);
 
-function generateExercises(workoutTypes: string[]): Exercise[] {
-  const exercisesByType: Record<string, Exercise[]> = {
-    Push: [
-      { name: "Bench Press", sets: 4, reps: 8, weight: 60, note: "Felt strong today" },
-      { name: "Incline Dumbbell Press", sets: 3, reps: 10, weight: 22 },
-      { name: "Cable Flyes", sets: 3, reps: 12, weight: 15 },
-    ],
-    Chest: [
-      { name: "Dumbbell Pullover", sets: 3, reps: 12, weight: 20 },
-    ],
-    Triceps: [
-      { name: "Tricep Pushdown", sets: 3, reps: 12, weight: 25 },
-      { name: "Overhead Extension", sets: 3, reps: 10, weight: 15 },
-    ],
-    Pull: [
-      { name: "Deadlift", sets: 4, reps: 5, weight: 100 },
-      { name: "Barbell Row", sets: 4, reps: 8, weight: 60 },
-      { name: "Lat Pulldown", sets: 3, reps: 10, weight: 50 },
-    ],
-    Back: [
-      { name: "Seated Row", sets: 3, reps: 10, weight: 55 },
-    ],
-    Biceps: [
-      { name: "Barbell Curl", sets: 3, reps: 10, weight: 25 },
-      { name: "Hammer Curl", sets: 3, reps: 12, weight: 12 },
-    ],
-    Legs: [
-      { name: "Squat", sets: 4, reps: 8, weight: 80, note: "Depth was good" },
-      { name: "Romanian Deadlift", sets: 3, reps: 10, weight: 60 },
-      { name: "Leg Press", sets: 3, reps: 12, weight: 120 },
-      { name: "Leg Curl", sets: 3, reps: 12, weight: 40 },
-    ],
-    Glutes: [
-      { name: "Hip Thrust", sets: 3, reps: 12, weight: 70 },
-    ],
-    Shoulders: [
-      { name: "Overhead Press", sets: 4, reps: 8, weight: 40 },
-      { name: "Lateral Raise", sets: 3, reps: 15, weight: 8 },
-      { name: "Face Pull", sets: 3, reps: 15, weight: 20 },
-    ],
-    Core: [
-      { name: "Plank", sets: 3, reps: 60, weight: 0, note: "Seconds hold" },
-      { name: "Cable Crunch", sets: 3, reps: 15, weight: 30 },
-    ],
-  };
-
-  const exercises: Exercise[] = [];
-  for (const type of workoutTypes) {
-    const typeExercises = exercisesByType[type];
-    if (typeExercises) {
-      exercises.push(...typeExercises);
+  // Fetch session data
+  const fetchSession = useCallback(async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
     }
-  }
-  
-  return exercises;
-}
 
-function generateNotes(status: SessionStatus): string | undefined {
-  if (status !== "completed") return undefined;
-  
-  const notes = [
-    "Energy was low initially, improved after second set.",
-    "Good session overall. Increased weight on main lifts.",
-    "Focused on form today. Felt controlled throughout.",
-    undefined,
-    undefined, // Sometimes no notes
-    undefined,
-  ];
-  
-  return notes[Math.floor(Math.random() * notes.length)];
-}
+    try {
+      setIsLoading(true);
+      setError(null);
 
-/**
- * Hook to get gym session data for a specific day
- */
-export function useGymSession(dayOfYear?: number) {
-  const currentYear = new Date().getFullYear();
-  const today = getDayOfYear(new Date());
-  const targetDay = dayOfYear ?? today;
-  
-  const session = useMemo(() => {
-    // Ensure day is within valid range
-    const totalDays = getDaysInYear(currentYear);
-    const validDay = Math.max(1, Math.min(targetDay, totalDays));
-    return generateMockSession(validDay, currentYear);
-  }, [targetDay, currentYear]);
-  
+      const { data, error: fetchError } = await supabase
+        .from("gym_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("session_date", dateString)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Error fetching session:", fetchError);
+        setError(fetchError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data) {
+        // Session exists
+        setSession({
+          id: data.id,
+          date: data.session_date,
+          duration_minutes: data.duration_minutes,
+          workout_type: data.workout_type,
+          exercises: (data.exercises as Exercise[]) || [],
+          notes: data.notes,
+          exists: true,
+          isToday,
+        });
+      } else {
+        // Session doesn't exist - set empty session
+        setSession({
+          date: dateString,
+          duration_minutes: null,
+          workout_type: null,
+          exercises: [],
+          notes: null,
+          exists: false,
+          isToday,
+        });
+      }
+    } catch (err) {
+      console.error("Error in fetchSession:", err);
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, dateString, isToday]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  // Create or update session
+  const saveSession = useCallback(
+    async (updates: Partial<Omit<GymSessionData, "id" | "date" | "exists" | "isToday">>) => {
+      if (!user || !session) return { success: false, error: "No user or session" };
+
+      try {
+        if (session.exists && session.id) {
+          // Update existing session
+          const updateData: GymSessionUpdate = {
+            duration_minutes: updates.duration_minutes !== undefined ? updates.duration_minutes : session.duration_minutes,
+            workout_type: updates.workout_type !== undefined ? updates.workout_type : session.workout_type,
+            exercises: updates.exercises !== undefined ? updates.exercises : session.exercises,
+            notes: updates.notes !== undefined ? updates.notes : session.notes,
+          };
+
+          const { data, error: updateError } = await supabase
+            .from("gym_sessions")
+            .update(updateData)
+            .eq("id", session.id)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error("Error updating session:", updateError);
+            return { success: false, error: updateError.message };
+          }
+
+          // Update local state
+          setSession({
+            id: data.id,
+            date: data.session_date,
+            duration_minutes: data.duration_minutes,
+            workout_type: data.workout_type,
+            exercises: (data.exercises as Exercise[]) || [],
+            notes: data.notes,
+            exists: true,
+            isToday,
+          });
+
+          return { success: true };
+        } else {
+          // Create new session
+          const insertData: GymSessionInsert = {
+            user_id: user.id,
+            session_date: dateString,
+            duration_minutes: updates.duration_minutes || null,
+            workout_type: updates.workout_type || null,
+            exercises: updates.exercises || [],
+            notes: updates.notes || null,
+          };
+
+          const { data, error: insertError } = await supabase
+            .from("gym_sessions")
+            .insert(insertData)
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Error creating session:", insertError);
+            return { success: false, error: insertError.message };
+          }
+
+          // Update local state
+          setSession({
+            id: data.id,
+            date: data.session_date,
+            duration_minutes: data.duration_minutes,
+            workout_type: data.workout_type,
+            exercises: (data.exercises as Exercise[]) || [],
+            notes: data.notes,
+            exists: true,
+            isToday,
+          });
+
+          return { success: true };
+        }
+      } catch (err) {
+        console.error("Error in saveSession:", err);
+        return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+      }
+    },
+    [user, session, dateString, isToday]
+  );
+
   return {
     session,
-    year: currentYear,
-    totalDays: getDaysInYear(currentYear),
+    isLoading,
+    error,
+    saveSession,
+    refetch: fetchSession,
   };
 }

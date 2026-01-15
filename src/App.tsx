@@ -2,10 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
+import { RootRedirect } from "@/components/RootRedirect";
 import GymSessionDetail from "./pages/GymSessionDetail";
 import Auth from "./pages/Auth";
 import ProfileSetup from "./pages/ProfileSetup";
@@ -25,14 +25,10 @@ const App = () => (
             <Route path="/profile-setup" element={<ProfileSetup />} />
             <Route
               path="/"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
+              element={<RootRedirect />}
             />
             <Route
-              path="/session/:day"
+              path="/session/:date"
               element={
                 <ProtectedRoute>
                   <GymSessionDetail />

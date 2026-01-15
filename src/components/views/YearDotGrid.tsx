@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useGymData } from "@/hooks/useGymData";
 import { getDateFromDayOfYear, formatDateShort } from "@/lib/dateUtils";
+import { format } from "date-fns";
 
 interface YearDotGridProps {
   onViewChange?: () => void;
@@ -19,9 +20,11 @@ export function YearDotGrid({ onViewChange }: YearDotGridProps) {
   // Calculate grid dimensions (roughly 20 columns)
   const columns = 20;
 
-  // Navigate to session detail page
+  // Navigate to session detail page with YYYY-MM-DD format
   const handleDayClick = (day: number) => {
-    navigate(`/session/${day}`);
+    const date = getDateFromDayOfYear(day, year);
+    const dateString = format(date, "yyyy-MM-dd");
+    navigate(`/session/${dateString}`);
   };
   
   return (

@@ -25,7 +25,9 @@ export default function ProfileSetup() {
       if (!user) {
         navigate("/auth", { replace: true });
       } else if (profile) {
-        navigate("/", { replace: true });
+        // Redirect to today's session
+        const today = format(new Date(), "yyyy-MM-dd");
+        navigate(`/session/${today}`, { replace: true });
       }
     }
   }, [isInitialized, isLoading, user, profile, navigate]);
@@ -50,7 +52,9 @@ export default function ProfileSetup() {
     setIsSubmitting(false);
 
     if (result.success) {
-      navigate("/", { replace: true });
+      // Redirect to today's session
+      const today = format(new Date(), "yyyy-MM-dd");
+      navigate(`/session/${today}`, { replace: true });
     } else if (result.error) {
       setError(result.error);
     }

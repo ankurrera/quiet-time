@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { validateEmail, validatePassword } from "@/lib/authTypes";
+import { format } from "date-fns";
 
 type AuthMode = "signin" | "signup";
 
@@ -20,7 +21,9 @@ export default function Auth() {
   useEffect(() => {
     if (isInitialized && user) {
       if (profile) {
-        navigate("/", { replace: true });
+        // Redirect to today's session
+        const today = format(new Date(), "yyyy-MM-dd");
+        navigate(`/session/${today}`, { replace: true });
       } else {
         navigate("/profile-setup", { replace: true });
       }

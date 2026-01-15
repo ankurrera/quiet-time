@@ -1,12 +1,19 @@
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useGymData } from "@/hooks/useGymData";
+import { getDateFromDayOfYear } from "@/lib/dateUtils";
+import { format } from "date-fns";
 
 interface YearProgressBarProps {
   onViewChange?: () => void;
 }
 
 export function YearProgressBar({ onViewChange }: YearProgressBarProps) {
+  const navigate = useNavigate();
   const { stats, isAttended, isToday, isPast, year } = useGymData();
+  const barRef = useRef<HTMLDivElement>(null);
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   
   // Create array of days for the bar visualization
   const days = Array.from({ length: stats.totalDays }, (_, i) => i + 1);
@@ -28,8 +35,44 @@ export function YearProgressBar({ onViewChange }: YearProgressBarProps) {
       attendanceRatio,
       isPast: group.some(isPast),
       isFuture: group.every(d => d > stats.today),
+      midDay: group[Math.floor(group.length / 2)],
     });
   }
+
+  // Handle click on progress bar to navigate to that day
+  const handleBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!barRef.current) return;
+    
+    const rect = barRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const clickPercentage = x / width;
+    
+    // Calculate day of year from click position
+    const dayOfYear = Math.max(1, Math.min(Math.floor(clickPercentage * stats.totalDays) + 1, stats.totalDays));
+    
+    // Navigate to that day's session
+    const date = getDateFromDayOfYear(dayOfYear, year);
+    const dateString = format(date, "yyyy-MM-dd");
+    navigate(`/session/${dateString}`);
+  };
+
+  // Handle hover to show which day
+  const handleBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!barRef.current) return;
+    
+    const rect = barRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const hoverPercentage = x / width;
+    
+    const dayOfYear = Math.max(1, Math.min(Math.floor(hoverPercentage * stats.totalDays) + 1, stats.totalDays));
+    setHoveredDay(dayOfYear);
+  };
+
+  const handleBarLeave = () => {
+    setHoveredDay(null);
+  };
 
   return (
     <div className="flex-1 flex items-center justify-center px-6 animate-fade-in">
@@ -57,9 +100,15 @@ export function YearProgressBar({ onViewChange }: YearProgressBarProps) {
             </div>
           </div>
           
-          {/* Progress bar visualization */}
-          <div className="my-8">
-            <div className="flex items-end justify-center gap-[2px] h-16">
+          {/* Progress bar visualization - Interactive */}
+          <div className="my-8 relative">
+            <div 
+              ref={barRef}
+              className="flex items-end justify-center gap-[2px] h-16 cursor-pointer"
+              onClick={handleBarClick}
+              onMouseMove={handleBarHover}
+              onMouseLeave={handleBarLeave}
+            >
               {groupedDays.map((group, idx) => (
                 <div
                   key={idx}
@@ -75,6 +124,13 @@ export function YearProgressBar({ onViewChange }: YearProgressBarProps) {
                 />
               ))}
             </div>
+            
+            {/* Tooltip */}
+            {hoveredDay && (
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-foreground text-background px-3 py-1.5 rounded-lg text-xs whitespace-nowrap animate-fade-in">
+                Day {hoveredDay} • Click to view
+              </div>
+            )}
           </div>
           
           {/* Days remaining */}
