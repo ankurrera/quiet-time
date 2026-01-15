@@ -1,8 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
+import { YearViewPanel } from "@/components/YearViewPanel";
 import { useGymSession } from "@/hooks/useGymSession";
-import { format, parse } from "date-fns";
+import { format, parse, addDays, subDays } from "date-fns";
+import { Calendar } from "lucide-react";
+
+// Debounce utility
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 /**
  * Gym Session Detail Page
@@ -17,6 +36,7 @@ export function GymSessionDetail() {
   const { date: dateParam } = useParams<{ date: string }>();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
+  const [showYearView, setShowYearView] = useState(false);
   
   // Validate and use date parameter, default to today
   const dateString = dateParam || format(new Date(), "yyyy-MM-dd");
@@ -36,6 +56,11 @@ export function GymSessionDetail() {
   const [editWorkoutType, setEditWorkoutType] = useState<string>("");
   const [editNotes, setEditNotes] = useState<string>("");
 
+  // Debounced values for autosave
+  const debouncedDuration = useDebounce(editDuration, 1000);
+  const debouncedWorkoutType = useDebounce(editWorkoutType, 1000);
+  const debouncedNotes = useDebounce(editNotes, 1000);
+
   // When entering edit mode, populate local state
   const handleStartEdit = () => {
     if (session) {
@@ -46,25 +71,75 @@ export function GymSessionDetail() {
     }
   };
 
-  // Save changes
-  const handleSave = async () => {
-    if (!session) return;
+  // Autosave when debounced values change
+  useEffect(() => {
+    if (!isEditing || !session) return;
 
-    const updates = {
-      duration_minutes: editDuration ? parseInt(editDuration, 10) : null,
-      workout_type: editWorkoutType || null,
-      notes: editNotes || null,
-    };
+    // Only save if values have changed from original
+    const hasChanges =
+      debouncedDuration !== (session.duration_minutes?.toString() || "") ||
+      debouncedWorkoutType !== (session.workout_type || "") ||
+      debouncedNotes !== (session.notes || "");
 
-    const result = await saveSession(updates);
-    if (result.success) {
-      setIsEditing(false);
+    if (hasChanges) {
+      const updates = {
+        duration_minutes: debouncedDuration ? parseInt(debouncedDuration, 10) : null,
+        workout_type: debouncedWorkoutType || null,
+        notes: debouncedNotes || null,
+      };
+      saveSession(updates);
     }
+  }, [debouncedDuration, debouncedWorkoutType, debouncedNotes, isEditing, session, saveSession]);
+
+  // Done editing
+  const handleDoneEdit = () => {
+    setIsEditing(false);
   };
 
-  // Cancel editing
-  const handleCancel = () => {
-    setIsEditing(false);
+  // Navigate to previous day
+  const goToPreviousDay = () => {
+    const prevDate = subDays(date, 1);
+    const prevDateString = format(prevDate, "yyyy-MM-dd");
+    navigate(`/session/${prevDateString}`);
+  };
+
+  // Navigate to next day
+  const goToNextDay = () => {
+    const nextDate = addDays(date, 1);
+    const nextDateString = format(nextDate, "yyyy-MM-dd");
+    navigate(`/session/${nextDateString}`);
+  };
+
+  // Touch/swipe handling for mobile
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Minimum swipe distance (in px)
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      // Swipe left → next day
+      goToNextDay();
+    } else if (isRightSwipe) {
+      // Swipe right → previous day
+      goToPreviousDay();
+    }
   };
 
   if (isLoading || !session) {
@@ -83,9 +158,25 @@ export function GymSessionDetail() {
   
   return (
     <AppShell>
-      <div className="flex-1 flex flex-col px-6 py-12 animate-fade-in max-w-md mx-auto w-full">
+      <YearViewPanel isOpen={showYearView} onClose={() => setShowYearView(false)} />
+      
+      <div 
+        className="flex-1 flex flex-col px-6 py-12 animate-fade-in max-w-md mx-auto w-full"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {/* HEADER - Very Subtle, Centered */}
-        <header className="text-center mb-10">
+        <header className="text-center mb-10 relative">
+          {/* Calendar button - top right */}
+          <button
+            onClick={() => setShowYearView(true)}
+            className="absolute top-0 right-0 p-2 rounded-full transition-calm hover:bg-muted"
+            aria-label="View year"
+          >
+            <Calendar className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+          </button>
+
           {/* Small label - light, uppercase */}
           <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-3">
             Session
@@ -243,16 +334,10 @@ export function GymSessionDetail() {
                 {/* Buttons */}
                 <div className="flex gap-3 pt-4">
                   <button
-                    onClick={handleSave}
+                    onClick={handleDoneEdit}
                     className="flex-1 bg-foreground text-background py-3 rounded-full text-sm font-normal transition-calm hover:opacity-90"
                   >
-                    Save
-                  </button>
-                  <button
-                    onClick={handleCancel}
-                    className="flex-1 bg-transparent border border-border text-foreground py-3 rounded-full text-sm font-normal transition-calm hover:bg-container"
-                  >
-                    Cancel
+                    Done
                   </button>
                 </div>
               </div>
