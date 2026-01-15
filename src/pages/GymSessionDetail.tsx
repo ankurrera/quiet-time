@@ -3,10 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { YearViewPanel } from "@/components/YearViewPanel";
 import { useGymSession } from "@/hooks/useGymSession";
+import { useSessionExercises } from "@/hooks/useSessionExercises";
+import { useRoutines } from "@/hooks/useRoutines";
+import { useRoutine } from "@/hooks/useRoutine";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getDayOfYear } from "@/lib/dateUtils";
 import { format, parse, addDays, subDays } from "date-fns";
 import { Calendar } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 // Constants
 const AUTOSAVE_DELAY_MS = 1000;
@@ -17,21 +21,22 @@ const MIN_SWIPE_DISTANCE_PX = 50;
  * 
  * Design Philosophy:
  * - A quiet log, a reflection of effort
- * - Not a fitness dashboard
- * - Not motivational or performance-driven
- * - Answers: "What did I do on this day?"
+ * - Routines define structure, sessions define reality
+ * - Time is the primary axis
  */
 export function GymSessionDetail() {
   const { date: dateParam } = useParams<{ date: string }>();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
   const [showYearView, setShowYearView] = useState(false);
+  const [showRoutineSelector, setShowRoutineSelector] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   
   // Validate and use date parameter, default to today
   const dateString = dateParam || format(new Date(), "yyyy-MM-dd");
   const { session, isLoading, saveSession } = useGymSession(dateString);
+  const { exercises, isLoading: exercisesLoading, updateSet } = useSessionExercises(session?.id);
+  const { routines } = useRoutines();
   
   // Parse date for display
   const date = parse(dateString, "yyyy-MM-dd", new Date());
@@ -40,50 +45,38 @@ export function GymSessionDetail() {
   const dayOfYear = getDayOfYear(date);
   const totalDays = date.getFullYear() % 4 === 0 ? 366 : 365;
 
-  // Local state for editing
+  // Local state for editing basic fields
   const [editDuration, setEditDuration] = useState<string>("");
-  const [editWorkoutType, setEditWorkoutType] = useState<string>("");
   const [editNotes, setEditNotes] = useState<string>("");
 
   // Debounced values for autosave
   const debouncedDuration = useDebounce(editDuration, AUTOSAVE_DELAY_MS);
-  const debouncedWorkoutType = useDebounce(editWorkoutType, AUTOSAVE_DELAY_MS);
   const debouncedNotes = useDebounce(editNotes, AUTOSAVE_DELAY_MS);
 
-  // When entering edit mode, populate local state
-  const handleStartEdit = () => {
+  // Initialize edit state when session loads
+  useEffect(() => {
     if (session) {
       setEditDuration(session.duration_minutes?.toString() || "");
-      setEditWorkoutType(session.workout_type || "");
       setEditNotes(session.notes || "");
-      setIsEditing(true);
     }
-  };
+  }, [session?.id]);
 
   // Autosave when debounced values change
   useEffect(() => {
-    if (!isEditing || !session) return;
+    if (!session || !session.exists) return;
 
-    // Only save if values have changed from original
     const hasChanges =
       debouncedDuration !== (session.duration_minutes?.toString() || "") ||
-      debouncedWorkoutType !== (session.workout_type || "") ||
       debouncedNotes !== (session.notes || "");
 
     if (hasChanges) {
       const updates = {
         duration_minutes: debouncedDuration ? parseInt(debouncedDuration, 10) : null,
-        workout_type: debouncedWorkoutType || null,
         notes: debouncedNotes || null,
       };
       saveSession(updates);
     }
-  }, [debouncedDuration, debouncedWorkoutType, debouncedNotes, isEditing, session, saveSession]);
-
-  // Done editing
-  const handleDoneEdit = () => {
-    setIsEditing(false);
-  };
+  }, [debouncedDuration, debouncedNotes, session, saveSession]);
 
   // Navigate to previous day with animation
   const goToPreviousDay = useCallback(() => {
@@ -112,17 +105,15 @@ export function GymSessionDetail() {
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (isEditing) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (isEditing || !touchStart) return;
+    if (!touchStart) return;
     const currentX = e.targetTouches[0].clientX;
     setTouchEnd(currentX);
     
-    // Calculate offset for visual feedback (clamped)
     const diff = currentX - touchStart;
     const clampedOffset = Math.max(-60, Math.min(60, diff * 0.4));
     setSwipeOffset(clampedOffset);
@@ -143,7 +134,6 @@ export function GymSessionDetail() {
     } else if (isRightSwipe) {
       goToPreviousDay();
     } else {
-      // Reset offset if no navigation
       setSwipeOffset(0);
     }
     
@@ -161,13 +151,21 @@ export function GymSessionDetail() {
     );
   }
 
-  // Determine status
-  const hasData = session.duration_minutes || session.workout_type || session.notes || session.exercises.length > 0;
+  const hasData = session.duration_minutes || session.notes || exercises.length > 0;
   const statusText = hasData ? "Workout logged" : "No session logged";
   
   return (
     <AppShell>
       <YearViewPanel isOpen={showYearView} onClose={() => setShowYearView(false)} />
+      <RoutineSelectorSheet
+        isOpen={showRoutineSelector}
+        onClose={() => setShowRoutineSelector(false)}
+        routines={routines}
+        sessionId={session.id}
+        onRoutineSelected={() => {
+          setShowRoutineSelector(false);
+        }}
+      />
       
       <div 
         className={`flex-1 flex flex-col px-6 py-12 max-w-md mx-auto w-full transition-transform duration-150 ease-out ${
@@ -180,9 +178,8 @@ export function GymSessionDetail() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* HEADER - Very Subtle, Centered */}
+        {/* HEADER */}
         <header className="text-center mb-10 relative">
-          {/* Calendar button - top right */}
           <button
             onClick={() => setShowYearView(true)}
             className="absolute top-0 right-0 p-2 rounded-full transition-calm hover:bg-muted"
@@ -191,23 +188,20 @@ export function GymSessionDetail() {
             <Calendar className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
           </button>
 
-          {/* Small label - light, uppercase */}
           <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-3">
             Session
           </p>
           
-          {/* Primary heading - serif */}
           <h1 className="font-serif text-2xl tracking-tight mb-2">
             {dayName}, {monthDay}
           </h1>
           
-          {/* Subtext - light gray */}
           <p className="text-sm font-light text-text-secondary">
             Day {dayOfYear} of {totalDays}
           </p>
         </header>
         
-        {/* SESSION STATUS - Single line, centered */}
+        {/* SESSION STATUS */}
         <div className="text-center mb-10">
           <p className="text-sm font-light flex items-center justify-center">
             <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
@@ -216,159 +210,273 @@ export function GymSessionDetail() {
             {statusText}
           </p>
         </div>
+
+        {/* ROUTINE SELECTION PROMPT */}
+        {exercises.length === 0 && (
+          <div className="mb-8 text-center">
+            <p className="text-sm font-light text-text-secondary mb-4">
+              Select a routine for today
+            </p>
+            <button
+              onClick={() => setShowRoutineSelector(true)}
+              className="text-sm font-light underline underline-offset-4 transition-calm hover:text-foreground"
+            >
+              Choose routine
+            </button>
+            <p className="text-xs font-light text-text-secondary mt-4">
+              or{" "}
+              <button
+                onClick={() => navigate("/routines")}
+                className="underline underline-offset-4 transition-calm hover:text-foreground"
+              >
+                create a new one
+              </button>
+            </p>
+          </div>
+        )}
         
-        {/* MAIN CONTENT CARD - Soft container */}
-        <div 
-          className="bg-container rounded-3xl p-8 mb-10 cursor-pointer transition-calm hover:bg-container/80"
-          onClick={!isEditing ? handleStartEdit : undefined}
-        >
-          {!isEditing ? (
-            <>
-              {/* VIEW MODE */}
-              {/* SECTION 1 — TIME SPENT */}
-              <section className="mb-10">
-                <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2">
-                  Time
-                </p>
-                <p className="font-serif text-3xl tracking-tight">
-                  {session.duration_minutes ? `${session.duration_minutes}m` : "—"}
-                </p>
-              </section>
-              
-              {/* SECTION 2 — WORKOUT TYPE */}
-              <section className="mb-10">
-                <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2">
-                  Workout Type
-                </p>
-                <p className="text-base font-light">
-                  {session.workout_type || "—"}
-                </p>
-              </section>
-              
-              {/* SECTION 3 — EXERCISE LOG */}
-              {session.exercises.length > 0 && (
-                <section className="mb-10">
-                  <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-4">
-                    Exercises
-                  </p>
-                  <div className="space-y-6">
-                    {session.exercises.map((exercise, index) => (
-                      <div key={index}>
-                        {/* Exercise name - serif */}
-                        <p className="font-serif text-lg mb-1">
-                          {exercise.name}
-                        </p>
-                        {/* Details */}
-                        {(exercise.sets || exercise.reps || exercise.weight) && (
-                          <p className="text-sm font-light tracking-tight font-mono text-foreground/80">
-                            {exercise.sets && `${exercise.sets} sets`}
-                            {exercise.sets && exercise.reps && " × "}
-                            {exercise.reps && `${exercise.reps} reps`}
-                            {(exercise.sets || exercise.reps) && exercise.weight && " — "}
-                            {exercise.weight && `${exercise.weight} kg`}
-                          </p>
-                        )}
-                        {/* Optional note */}
-                        {exercise.note && (
-                          <p className="text-sm italic text-text-secondary mt-1.5">
-                            {exercise.note}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-              
-              {/* SECTION 4 — SESSION NOTES */}
-              {session.notes && (
-                <section>
-                  <p className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2">
-                    Notes
-                  </p>
-                  <p className="text-sm font-light leading-relaxed">
-                    "{session.notes}"
-                  </p>
-                </section>
-              )}
+        {/* EXERCISES */}
+        {exercises.length > 0 && (
+          <div className="space-y-6 mb-8">
+            {exercises.map((exercise) => (
+              <ExerciseLog
+                key={exercise.id}
+                exercise={exercise}
+                onSetUpdate={(setId, updates) => updateSet(setId, updates)}
+              />
+            ))}
+          </div>
+        )}
 
-              {/* HINT */}
-              <div className="mt-10 pt-6 border-t border-border/30 text-center">
-                <p className="text-xs text-text-secondary/60">
-                  Tap to edit
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* EDIT MODE */}
-              <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
-                {/* Duration */}
-                <div>
-                  <label className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2 block">
-                    Duration (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    value={editDuration}
-                    onChange={(e) => setEditDuration(e.target.value)}
-                    placeholder="60"
-                    className="w-full px-0 py-2 text-2xl bg-transparent border-0 border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm"
-                  />
-                </div>
+        {/* TIME & NOTES */}
+        <div className="bg-container rounded-3xl p-8 mb-10">
+          {/* Duration */}
+          <div className="mb-6">
+            <label className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2 block">
+              Duration (minutes)
+            </label>
+            <input
+              type="number"
+              value={editDuration}
+              onChange={(e) => setEditDuration(e.target.value)}
+              placeholder="60"
+              className="w-full px-0 py-2 text-2xl bg-transparent border-0 border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm"
+            />
+          </div>
 
-                {/* Workout Type */}
-                <div>
-                  <label className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2 block">
-                    Workout Type
-                  </label>
-                  <input
-                    type="text"
-                    value={editWorkoutType}
-                    onChange={(e) => setEditWorkoutType(e.target.value)}
-                    placeholder="Push, Pull, Legs..."
-                    className="w-full px-0 py-2 text-base bg-transparent border-0 border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm"
-                  />
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2 block">
-                    Notes
-                  </label>
-                  <textarea
-                    value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
-                    placeholder="How did you feel?"
-                    rows={3}
-                    className="w-full px-0 py-2 text-sm bg-transparent border-0 border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm resize-none"
-                  />
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={handleDoneEdit}
-                    className="flex-1 bg-foreground text-background py-3 rounded-full text-sm font-normal transition-calm hover:opacity-90"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          {/* Notes */}
+          <div>
+            <label className="text-xs font-light uppercase tracking-[0.2em] text-text-secondary mb-2 block">
+              Notes
+            </label>
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="How did you feel?"
+              rows={3}
+              className="w-full px-0 py-2 text-sm bg-transparent border-0 border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm resize-none"
+            />
+          </div>
         </div>
         
-        {/* FOOTER — Time Context, Very Quiet */}
-        {!isEditing && (
-          <footer className="text-center mt-auto pt-8">
-            <p className="text-sm font-light text-text-secondary">
-              {hasData ? "You showed up today." : "Every day is an opportunity."}
-            </p>
-          </footer>
-        )}
+        {/* FOOTER */}
+        <footer className="text-center mt-auto pt-8">
+          <p className="text-sm font-light text-text-secondary">
+            {hasData ? "You showed up today." : "Every day is an opportunity."}
+          </p>
+        </footer>
       </div>
     </AppShell>
+  );
+}
+
+/**
+ * Exercise Log Component
+ * Shows exercise name and individual sets with inline editing
+ */
+interface ExerciseLogProps {
+  exercise: {
+    id?: string;
+    name: string;
+    sets: Array<{
+      id?: string;
+      set_number: number;
+      reps: number | null;
+      weight: number | null;
+      rest_seconds: number | null;
+    }>;
+  };
+  onSetUpdate: (setId: string, updates: { reps?: number | null; weight?: number | null }) => void;
+}
+
+function ExerciseLog({ exercise, onSetUpdate }: ExerciseLogProps) {
+  return (
+    <div className="bg-container rounded-3xl p-6">
+      <h3 className="font-serif text-lg mb-4">{exercise.name}</h3>
+      
+      <div className="space-y-3">
+        {exercise.sets.map((set) => (
+          <SetRow
+            key={set.id || set.set_number}
+            set={set}
+            onUpdate={(updates) => set.id && onSetUpdate(set.id, updates)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Individual Set Row
+ * Allows inline editing of reps and weight
+ */
+interface SetRowProps {
+  set: {
+    id?: string;
+    set_number: number;
+    reps: number | null;
+    weight: number | null;
+    rest_seconds: number | null;
+  };
+  onUpdate: (updates: { reps?: number | null; weight?: number | null }) => void;
+}
+
+function SetRow({ set, onUpdate }: SetRowProps) {
+  const [editReps, setEditReps] = useState(set.reps?.toString() || "");
+  const [editWeight, setEditWeight] = useState(set.weight?.toString() || "");
+
+  const debouncedReps = useDebounce(editReps, AUTOSAVE_DELAY_MS);
+  const debouncedWeight = useDebounce(editWeight, AUTOSAVE_DELAY_MS);
+
+  useEffect(() => {
+    const hasChanges =
+      debouncedReps !== (set.reps?.toString() || "") ||
+      debouncedWeight !== (set.weight?.toString() || "");
+
+    if (hasChanges) {
+      onUpdate({
+        reps: debouncedReps ? parseInt(debouncedReps, 10) : null,
+        weight: debouncedWeight ? parseFloat(debouncedWeight) : null,
+      });
+    }
+  }, [debouncedReps, debouncedWeight]);
+
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className="text-text-secondary w-12">Set {set.set_number}</span>
+      
+      <input
+        type="number"
+        value={editReps}
+        onChange={(e) => setEditReps(e.target.value)}
+        placeholder="8"
+        className="w-16 px-2 py-1 text-center bg-transparent border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm"
+      />
+      <span className="text-text-secondary">reps</span>
+      
+      <input
+        type="number"
+        step="0.5"
+        value={editWeight}
+        onChange={(e) => setEditWeight(e.target.value)}
+        placeholder="60"
+        className="w-16 px-2 py-1 text-center bg-transparent border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-calm"
+      />
+      <span className="text-text-secondary">kg</span>
+    </div>
+  );
+}
+
+/**
+ * Routine Selector Sheet
+ * Bottom sheet for selecting a routine for the session
+ */
+interface RoutineSelectorSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  routines: Array<{
+    id: string;
+    name: string;
+    focus: string | null;
+    exerciseCount: number;
+  }>;
+  sessionId?: string;
+  onRoutineSelected: () => void;
+}
+
+function RoutineSelectorSheet({
+  isOpen,
+  onClose,
+  routines,
+  sessionId,
+  onRoutineSelected,
+}: RoutineSelectorSheetProps) {
+  const { routine: selectedRoutine, isLoading: routineLoading } = useRoutine(undefined);
+  const { copyRoutineExercises } = useSessionExercises(sessionId);
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
+  const { routine: routineToLoad } = useRoutine(selectedRoutineId || undefined);
+
+  const handleSelectRoutine = async (routineId: string) => {
+    setSelectedRoutineId(routineId);
+  };
+
+  useEffect(() => {
+    if (routineToLoad && sessionId) {
+      // Copy exercises from routine to session
+      copyRoutineExercises(
+        routineToLoad.exercises.map(ex => ({
+          name: ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          rest_seconds: ex.rest_seconds,
+        }))
+      ).then(() => {
+        onRoutineSelected();
+        setSelectedRoutineId(null);
+      });
+    }
+  }, [routineToLoad, sessionId, copyRoutineExercises, onRoutineSelected]);
+
+  return (
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="font-serif text-xl text-center mb-6">
+            Select a Routine
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="space-y-4">
+          {routines.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-sm font-light text-text-secondary">
+                No routines yet. Create one to get started.
+              </p>
+            </div>
+          )}
+
+          {routines.map((routine) => (
+            <button
+              key={routine.id}
+              onClick={() => handleSelectRoutine(routine.id)}
+              disabled={selectedRoutineId === routine.id}
+              className="w-full text-left bg-container rounded-2xl p-5 transition-calm hover:bg-container/80 disabled:opacity-50"
+            >
+              <h3 className="font-serif text-lg mb-1">{routine.name}</h3>
+              {routine.focus && (
+                <p className="text-sm font-light text-text-secondary mb-2">
+                  {routine.focus}
+                </p>
+              )}
+              <p className="text-xs font-light text-text-secondary">
+                {routine.exerciseCount} {routine.exerciseCount === 1 ? "exercise" : "exercises"}
+              </p>
+            </button>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
