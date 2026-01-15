@@ -54,7 +54,6 @@ export function GymSessionDetail() {
   const debouncedNotes = useDebounce(editNotes, AUTOSAVE_DELAY_MS);
 
   // Initialize edit state when session loads
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (session) {
       setEditDuration(session.duration_minutes?.toString() || "");

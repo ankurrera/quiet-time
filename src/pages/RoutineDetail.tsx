@@ -37,7 +37,6 @@ export function RoutineDetail() {
   const debouncedFocus = useDebounce(editFocus, AUTOSAVE_DELAY_MS);
 
   // Initialize edit state when routine loads
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (routine) {
       setEditName(routine.name);
