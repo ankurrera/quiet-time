@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RootRedirect } from "@/components/RootRedirect";
 import GymSessionDetail from "./pages/GymSessionDetail";
+import Routines from "./pages/Routines";
+import RoutineDetail from "./pages/RoutineDetail";
 import Auth from "./pages/Auth";
 import ProfileSetup from "./pages/ProfileSetup";
 import NotFound from "./pages/NotFound";
@@ -32,6 +34,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <GymSessionDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/routines"
+              element={
+                <ProtectedRoute>
+                  <Routines />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/routines/:routineId"
+              element={
+                <ProtectedRoute>
+                  <RoutineDetail />
                 </ProtectedRoute>
               }
             />
