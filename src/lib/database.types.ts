@@ -35,6 +35,41 @@ export interface Database {
           created_at?: string;
         };
       };
+      gym_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_date: string;
+          duration_minutes: number | null;
+          workout_type: string | null;
+          exercises: Json;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_date: string;
+          duration_minutes?: number | null;
+          workout_type?: string | null;
+          exercises?: Json;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          session_date?: string;
+          duration_minutes?: number | null;
+          workout_type?: string | null;
+          exercises?: Json;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
